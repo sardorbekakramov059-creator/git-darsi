@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyTube</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #0f0f0f; color: #f1f1f1; }
+
+    header {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      background: #0f0f0f; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 16px; z-index: 10;
+      border-bottom: 1px solid #272727;
+    }
+    .logo { font-weight: bold; font-size: 20px; color: #ff0000; cursor: pointer; }
+    .search { display: flex; flex: 0 1 600px; }
+    .search input {
+      flex: 1; padding: 8px 12px; border: 1px solid #303030;
+      background: #121212; color: #fff; border-radius: 40px 0 0 40px; outline: none;
+    }
+    .search button {
+      padding: 8px 18px; border: 1px solid #303030; border-left: none;
+      background: #222; color: #fff; border-radius: 0 40px 40px 0; cursor: pointer;
+    }
+
+    aside {
+      position: fixed; top: 56px; left: 0; bottom: 0; width: 220px;
+      background: #0f0f0f; padding: 12px; overflow-y: auto;
+    }
+    aside a {
+      display: block; padding: 10px 12px; color: #f1f1f1; text-decoration: none;
+      border-radius: 8px; cursor: pointer;
+    }
+    aside a:hover { background: #272727; }
+
+    main { margin: 56px 0 0 220px; padding: 20px; }
+
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .card { cursor: pointer; }
+    .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; }
+    .card h3 { font-size: 15px; margin: 8px 0 4px; line-height: 1.3; }
+    .card p { font-size: 13px; color: #aaa; }
+
+    /* Video sahifasi */
+    .player { display: none; }
+    .player.active { display: flex; gap: 24px; flex-wrap: wrap; }
+    .player .video-box { flex: 1 1 640px; }
+    .player iframe { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 12px; }
+    .player h2 { margin: 12px 0 6px; font-size: 18px; }
+    .player .side { flex: 0 1 360px; }
+    .player .side .mini {
+      display: flex; gap: 8px; margin-bottom: 12px; cursor: pointer;
+    }
+    .player .side .mini img { width: 160px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; }
+    .player .side .mini p { font-size: 14px; }
+
+    .back { background: none; border: none; color: #3ea6ff; cursor: pointer; font-size: 14px; margin-bottom: 12px; }
+
+    @media (max-width: 700px) {
+      aside { display: none; }
+      main { margin-left: 0; }
+      .search { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo" onclick="showHome()">▶ MyTube</div>
+  <div class="search">
+    <input id="searchInput" placeholder="Qidirish..." />
+    <button onclick="search()">🔍</button>
+  </div>
+  <div></div>
+</header>
+
+<aside>
+  <a onclick="filter('')">🏠 Bosh sahifa</a>
+  <a onclick="filter('music')">🎵 Musiqa</a>
+  <a onclick="filter('coding')">💻 Dasturlash</a>
+  <a onclick="filter('sport')">⚽ Sport</a>
+</aside>
+
+<main>
+  <div id="home">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div id="watch" class="player">
+    <div class="video-box">
+      <button class="back" onclick="showHome()">← Orqaga</button>
+      <iframe id="frame" allowfullscreen></iframe>
+      <h2 id="title"></h2>
+      <p id="meta" style="color:#aaa; font-size:14px;"></p>
+    </div>
+    <div class="side" id="related"></div>
+  </div>
+</main>
+
+<script>
+  // Videolar ro'yxati. youtubeId ni o'zingizga kerakli video ID bilan almashtiring
+  // (youtube.com/watch?v=XXXX dagi XXXX qismi)
+  const videos = [
+    { id: 1, youtubeId: "dQw4w9WgXcQ", title: "Demo video 1", channel: "Kanal 1", views: "1.2M ko'rish", category: "music" },
+    { id: 2, youtubeId: "jNQXAC9IVRw", title: "Demo video 2", channel: "Kanal 2", views: "800K ko'rish", category: "coding" },
+    { id: 3, youtubeId: "9bZkp7q19f0", title: "Demo video 3", channel: "Kanal 3", views: "2.5M ko'rish", category: "sport" },
+    { id: 4, youtubeId: "kJQP7kiw5Fk", title: "Demo video 4", channel: "Kanal 4", views: "500K ko'rish", category: "music" },
+    { id: 5, youtubeId: "RgKAFK5djSk", title: "Demo video 5", channel: "Kanal 5", views: "3.1M ko'rish", category: "coding" },
+    { id: 6, youtubeId: "OPf0YbXqDm0", title: "Demo video 6", channel: "Kanal 6", views: "900K ko'rish", category: "sport" }
+  ];
+
+  let currentList = videos;
+
+  function thumb(v) {
+    return `https://img.youtube.com/vi/${v.youtubeId}/hqdefault.jpg`;
+  }
+
+  function renderGrid(list) {
+    document.getElementById("grid").innerHTML = list.map(v => `
+      <div class="card" onclick="openVideo(${v.id})">
+        <img src="${thumb(v)}" alt="${v.title}" />
+        <h3>${v.title}</h3>
+        <p>${v.channel} · ${v.views}</p>
+      </div>
+    `).join("");
+  }
+
+  function openVideo(id) {
+    const v = videos.find(x => x.id === id);
+    document.getElementById("home").style.display = "none";
+    document.getElementById("watch").classList.add("active");
+    document.getElementById("frame").src = `https://www.youtube.com/embed/${v.youtubeId}`;
+    document.getElementById("title").textContent = v.title;
+    document.getElementById("meta").textContent = `${v.channel} · ${v.views}`;
+
+    const related = videos.filter(x => x.id !== id);
+    document.getElementById("related").innerHTML = related.map(r => `
+      <div class="mini" onclick="openVideo(${r.id})">
+        <img src="${thumb(r)}" alt="" />
+        <p>${r.title}<br><span style="color:#aaa">${r.channel}</span></p>
+      </div>
+    `).join("");
+  }
+
+  function showHome() {
+    document.getElementById("watch").classList.remove("active");
+    document.getElementById("frame").src = "";
+    document.getElementById("home").style.display = "block";
+  }
+
+  function filter(cat) {
+    showHome();
+    currentList = cat ? videos.filter(v => v.category === cat) : videos;
+    renderGrid(currentList);
+  }
+
+  function search() {
+    const q = document.getElementById("searchInput").value.toLowerCase().trim();
+    currentList = videos.filter(v => v.title.toLowerCase().includes(q) || v.channel.toLowerCase().includes(q));
+    showHome();
+    renderGrid(currentList);
+  }
+
+  document.getElementById("searchInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") search();
+  });
+
+  renderGrid(videos);
+</script>
+</body>
+</html>
